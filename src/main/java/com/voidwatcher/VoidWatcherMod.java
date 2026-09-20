@@ -2,6 +2,7 @@ package com.voidwatcher;
 
 import com.voidwatcher.entity.WatcherEntity;
 import com.voidwatcher.registry.ModEntities;
+import com.voidwatcher.registry.ModSounds;
 import com.voidwatcher.system.VoidWatcherSpawner;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.object.builder.v1.entity.FabricDefaultAttributeRegistry;
@@ -13,6 +14,7 @@ public class VoidWatcherMod implements ModInitializer {
     @Override
     public void onInitialize() {
         ModEntities.register();
+        ModSounds.register();
 
         FabricDefaultAttributeRegistry.register(
                 ModEntities.WATCHER,
