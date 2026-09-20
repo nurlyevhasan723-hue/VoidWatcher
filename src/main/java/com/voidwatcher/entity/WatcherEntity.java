@@ -252,7 +252,7 @@ public class WatcherEntity extends HostileEntity implements GeoEntity {
                         world.playSound(
                                 null,
                                 pos,
-                                SoundEvents.BLOCK_WOODEN_DOOR_BREAK,
+                                SoundEvents.BLOCK_WOOD_BREAK,
                                 SoundCategory.HOSTILE,
                                 0.9F,
                                 0.65F
@@ -265,13 +265,13 @@ public class WatcherEntity extends HostileEntity implements GeoEntity {
     }
 
     @Override
-    protected void writeCustomDataToNbt(NbtCompound nbt) {
+    public void writeCustomDataToNbt(NbtCompound nbt) {
         super.writeCustomDataToNbt(nbt);
         nbt.putInt("VoidWatcherEncounters", encounterLevel);
     }
 
     @Override
-    protected void readCustomDataFromNbt(NbtCompound nbt) {
+    public void readCustomDataFromNbt(NbtCompound nbt) {
         super.readCustomDataFromNbt(nbt);
         encounterLevel = nbt.getInt("VoidWatcherEncounters");
     }
