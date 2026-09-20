@@ -70,8 +70,8 @@ public class VoidWatcherClient implements ClientModInitializer {
         boolean hardTrigger = nearestDistance < 4.5 && nearest.isAttackingAnimation();
         boolean stareTrigger = nearestDistance < 10.0 && nearest.isStaring();
 
-        if (hardTrigger || (stareTrigger && client.world.random.nextInt(120) == 0)
-                || (nearestDistance < 4.5 && client.world.random.nextInt(80) == 0)) {
+        if (hardTrigger || (stareTrigger && client.world.getRandom().nextInt(120) == 0)
+                || (nearestDistance < 4.5 && client.world.getRandom().nextInt(80) == 0)) {
             triggerScare(client, nearestDistance < 5.0);
         }
     }
@@ -87,15 +87,15 @@ public class VoidWatcherClient implements ClientModInitializer {
                     violent ? 1.25F : 0.85F,
                     violent ? 0.55F : 0.45F
             );
-        }
 
-        scareText = switch (client.world.random.nextInt(5)) {
-            case 0 -> "НЕ ОБОРАЧИВАЙСЯ";
-            case 1 -> "ОН СМОТРИТ НА ТЕБЯ";
-            case 2 -> "БЕГИ";
-            case 3 -> "ТЫ УЖЕ НЕ ОДИН";
-            default -> "НЕ ДАЙ ЕМУ УВИДЕТЬ ТЕБЯ";
-        };
+            scareText = switch (client.world.getRandom().nextInt(5)) {
+                case 0 -> "НЕ ОБОРАЧИВАЙСЯ";
+                case 1 -> "ОН СМОТРИТ НА ТЕБЯ";
+                case 2 -> "БЕГИ";
+                case 3 -> "ТЫ УЖЕ НЕ ОДИН";
+                default -> "НЕ ДАЙ ЕМУ УВИДЕТЬ ТЕБЯ";
+            };
+        }
 
         client.player.sendMessage(
                 Text.literal("[VOID] " + scareText).formatted(Formatting.DARK_RED, Formatting.BOLD),
