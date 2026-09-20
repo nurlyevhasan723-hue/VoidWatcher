@@ -4,15 +4,14 @@ plugins {
 }
 
 group = 'com.voidwatcher'
-version = '0.1.0'
+version = '0.2.0'
 
 repositories {
     mavenCentral()
-    maven { url = 'https://maven.fabricmc.net/'
- }
-    maven { url = 'https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/'
- }
+    maven { url = 'https://maven.fabricmc.net/' }
+    maven { url = 'https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/' }
 }
+
 dependencies {
     minecraft "com.mojang:minecraft:1.21.1"
     mappings "net.fabricmc:yarn:1.21.1+build.3:v2"
@@ -26,3 +25,77 @@ java {
     toolchain.languageVersion = JavaLanguageVersion.of(21)
 }
 
+// Generate the 64x64 Watcher texture from deterministic pixel art.
+// This keeps the binary PNG out of Git and guarantees the resource exists before packaging.
+tasks.register("generateWatcherTexture") {
+    doLast {
+        def out = file("src/main/resources/assets/voidwatcher/textures/entity/watcher.png")
+        out.parentFile.mkdirs()
+
+        def image = new java.awt.image.BufferedImage(
+                64,
+                64,
+                java.awt.image.BufferedImage.TYPE_INT_ARGB
+        )
+        def g = image.createGraphics()
+        g.setComposite(java.awt.AlphaComposite.Src)
+        g.setColor(new java.awt.Color(0, 0, 0, 0))
+        g.fillRect(0, 0, 64, 64)
+
+        // Base charcoal texture.
+        g.setColor(new java.awt.Color(13, 14, 16, 255))
+        g.fillRect(0, 0, 64, 64)
+
+        // Subtle blocky noise.
+        def rng = new java.util.Random(1337L)
+        for (int i = 0; i < 700; i++) {
+            int x = rng.nextInt(64)
+            int y = rng.nextInt(64)
+            int v = 20 + rng.nextInt(38)
+            g.setColor(new java.awt.Color(v, v, v + rng.nextInt(8), 255))
+            g.fillRect(x, y, 1 + rng.nextInt(2), 1 + rng.nextInt(2))
+        }
+
+        // Head / face region.
+        g.setColor(new java.awt.Color(8, 9, 11, 255))
+        g.fillRect(0, 0, 16, 16)
+        g.setColor(new java.awt.Color(44, 45, 49, 255))
+        g.fillRect(2, 2, 12, 12)
+
+        // One void-eye.
+        g.setColor(new java.awt.Color(255, 255, 255, 255))
+        g.fillRect(5, 5, 5, 3)
+        g.setColor(new java.awt.Color(205, 230, 255, 255))
+        g.fillRect(6, 8, 3, 4)
+
+        // Torso + ribs.
+        g.setColor(new java.awt.Color(18, 19, 22, 255))
+        g.fillRect(16, 16, 16, 20)
+        for (int y : [20, 24, 28, 32]) {
+            g.setColor(new java.awt.Color(88, 88, 94, 255))
+            g.fillRect(18, y, 12, 1)
+        }
+
+        // Arms and legs.
+        g.setColor(new java.awt.Color(24, 25, 28, 255))
+        g.fillRect(0, 32, 20, 16)
+        g.fillRect(20, 32, 24, 16)
+        g.fillRect(44, 32, 16, 16)
+
+        // Claws.
+        g.setColor(new java.awt.Color(70, 70, 76, 255))
+        for (int x : [56, 58, 60]) {
+            g.fillRect(x, 48, 2, 10)
+        }
+        for (int x : [40, 42, 44]) {
+            g.fillRect(x, 54, 2, 8)
+        }
+
+        g.dispose()
+        javax.imageio.ImageIO.write(image, "png", out)
+    }
+}
+
+tasks.named("processResources") {
+    dependsOn(tasks.named("generateWatcherTexture"))
+}
