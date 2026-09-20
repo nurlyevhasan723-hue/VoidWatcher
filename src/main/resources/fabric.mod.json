@@ -1,20 +1,21 @@
 {
-  "schemaVersion":1,
-  "id":"voidwatcher",
-  "version":"0.1.0",
-  "name":"Void Watcher",
-  "description":"Original horror monster.",
+  "schemaVersion": 1,
+  "id": "voidwatcher",
+  "version": "0.2.0",
+  "name": "Void Watcher",
+  "description": "Original horror monster that stalks players at night.",
   "entrypoints": {
-  "main": [
-    "com.voidwatcher.VoidWatcherMod"
-  ],
-  "client": [
-    "com.voidwatcher.VoidWatcherClient"
-  ]
+    "main": [
+      "com.voidwatcher.VoidWatcherMod"
+    ],
+    "client": [
+      "com.voidwatcher.client.VoidWatcherClient"
+    ]
   },
-  "depends":{
-    "fabricloader":">=0.16.0",
-    "minecraft":"1.21.1",
-    "fabric-api":"*"
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "minecraft": "1.21.1",
+    "fabric-api": "*",
+    "geckolib": ">=4.7.1"
   }
 }
