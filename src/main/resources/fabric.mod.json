@@ -1,0 +1,20 @@
+{
+  "schemaVersion":1,
+  "id":"voidwatcher",
+  "version":"0.1.0",
+  "name":"Void Watcher",
+  "description":"Original horror monster.",
+  "entrypoints": {
+  "main": [
+    "com.voidwatcher.VoidWatcherMod"
+  ],
+  "client": [
+    "com.voidwatcher.VoidWatcherClient"
+  ]
+  },
+  "depends":{
+    "fabricloader":">=0.16.0",
+    "minecraft":"1.21.1",
+    "fabric-api":"*"
+  }
+}
