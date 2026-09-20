@@ -346,7 +346,7 @@ public class WatcherEntity extends HostileEntity implements GeoEntity {
             world.playSound(
                     null,
                     pos,
-                    state.getBlock().getSoundGroup(state).getBreakSound(),
+                    state.getSoundGroup().getBreakSound(),
                     SoundCategory.HOSTILE,
                     0.85F,
                     0.65F
