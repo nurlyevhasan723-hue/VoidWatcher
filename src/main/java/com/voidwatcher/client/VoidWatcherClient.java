@@ -1,4 +1,4 @@
-package com.voidwatcher;
+package com.voidwatcher.client;
 
 import com.voidwatcher.client.render.WatcherRenderer;
 import com.voidwatcher.registry.ModEntities;
