@@ -4,7 +4,7 @@ plugins {
 }
 
 group = 'com.voidwatcher'
-version = '0.2.0'
+version = '0.3.0'
 
 repositories {
     mavenCentral()
@@ -25,8 +25,7 @@ java {
     toolchain.languageVersion = JavaLanguageVersion.of(21)
 }
 
-// Generate the 64x64 Watcher texture from deterministic pixel art.
-// This keeps the binary PNG out of Git and guarantees the resource exists before packaging.
+// Generate an unnerving 64x64 texture from deterministic pixel art.
 tasks.register("generateWatcherTexture") {
     doLast {
         def out = file("src/main/resources/assets/voidwatcher/textures/entity/watcher.png")
@@ -42,53 +41,74 @@ tasks.register("generateWatcherTexture") {
         g.setColor(new java.awt.Color(0, 0, 0, 0))
         g.fillRect(0, 0, 64, 64)
 
-        // Base charcoal texture.
-        g.setColor(new java.awt.Color(13, 14, 16, 255))
+        def rng = new java.util.Random(90210L)
+
+        // Diseased grey-black base.
+        g.setColor(new java.awt.Color(10, 10, 12, 255))
         g.fillRect(0, 0, 64, 64)
 
-        // Subtle blocky noise.
-        def rng = new java.util.Random(1337L)
-        for (int i = 0; i < 700; i++) {
+        // Cold flesh patches and random cracks.
+        for (int i = 0; i < 900; i++) {
             int x = rng.nextInt(64)
             int y = rng.nextInt(64)
-            int v = 20 + rng.nextInt(38)
-            g.setColor(new java.awt.Color(v, v, v + rng.nextInt(8), 255))
+            int v = 22 + rng.nextInt(48)
+            int b = Math.min(90, v + 8)
+            g.setColor(new java.awt.Color(v, v, b, 255))
             g.fillRect(x, y, 1 + rng.nextInt(2), 1 + rng.nextInt(2))
         }
 
-        // Head / face region.
-        g.setColor(new java.awt.Color(8, 9, 11, 255))
-        g.fillRect(0, 0, 16, 16)
-        g.setColor(new java.awt.Color(44, 45, 49, 255))
-        g.fillRect(2, 2, 12, 12)
+        // Face.
+        g.setColor(new java.awt.Color(58, 58, 62, 255))
+        g.fillRect(1, 1, 14, 14)
+        g.setColor(new java.awt.Color(5, 5, 7, 255))
+        g.fillRect(2, 3, 12, 9)
 
-        // One void-eye.
-        g.setColor(new java.awt.Color(255, 255, 255, 255))
-        g.fillRect(5, 5, 5, 3)
-        g.setColor(new java.awt.Color(205, 230, 255, 255))
-        g.fillRect(6, 8, 3, 4)
+        // One dead-white eye with a red center.
+        g.setColor(new java.awt.Color(235, 235, 225, 255))
+        g.fillRect(4, 5, 9, 4)
+        g.setColor(new java.awt.Color(155, 10, 15, 255))
+        g.fillRect(7, 4, 3, 7)
+        g.setColor(new java.awt.Color(5, 5, 5, 255))
+        g.fillRect(8, 5, 1, 5)
 
-        // Torso + ribs.
-        g.setColor(new java.awt.Color(18, 19, 22, 255))
-        g.fillRect(16, 16, 16, 20)
-        for (int y : [20, 24, 28, 32]) {
-            g.setColor(new java.awt.Color(88, 88, 94, 255))
-            g.fillRect(18, y, 12, 1)
+        // Open mouth / teeth.
+        g.setColor(new java.awt.Color(3, 3, 4, 255))
+        g.fillRect(3, 10, 11, 5)
+        g.setColor(new java.awt.Color(210, 210, 198, 255))
+        for (int x : [4, 6, 8, 10, 12]) {
+            g.fillRect(x, 10, 1, 2)
         }
 
-        // Arms and legs.
-        g.setColor(new java.awt.Color(24, 25, 28, 255))
-        g.fillRect(0, 32, 20, 16)
-        g.fillRect(20, 32, 24, 16)
-        g.fillRect(44, 32, 16, 16)
-
-        // Claws.
-        g.setColor(new java.awt.Color(70, 70, 76, 255))
-        for (int x : [56, 58, 60]) {
-            g.fillRect(x, 48, 2, 10)
+        // Ribs.
+        g.setColor(new java.awt.Color(82, 82, 88, 255))
+        for (int y : [21, 24, 27, 30, 33]) {
+            g.fillRect(17, y, 14, 1)
         }
-        for (int x : [40, 42, 44]) {
-            g.fillRect(x, 54, 2, 8)
+        g.setColor(new java.awt.Color(15, 15, 17, 255))
+        g.fillRect(16, 16, 17, 20)
+
+        // Long limbs.
+        g.setColor(new java.awt.Color(28, 28, 32, 255))
+        g.fillRect(0, 32, 18, 18)
+        g.fillRect(18, 32, 28, 18)
+        g.fillRect(46, 32, 14, 18)
+
+        // Fingers / claws.
+        g.setColor(new java.awt.Color(116, 116, 120, 255))
+        for (int x : [50, 53, 56]) {
+            g.fillRect(x, 50, 2, 11)
+        }
+        for (int x : [36, 39, 42]) {
+            g.fillRect(x, 50, 2, 10)
+        }
+
+        // Random red-black stains.
+        for (int i = 0; i < 70; i++) {
+            int x = rng.nextInt(64)
+            int y = rng.nextInt(64)
+            int a = 70 + rng.nextInt(150)
+            g.setColor(new java.awt.Color(70 + rng.nextInt(80), 5, 8, a))
+            g.fillRect(x, y, 1 + rng.nextInt(3), 1 + rng.nextInt(4))
         }
 
         g.dispose()
