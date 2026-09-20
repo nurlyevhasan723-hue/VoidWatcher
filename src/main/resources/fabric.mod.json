@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "id": "voidwatcher",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "name": "Void Watcher",
-  "description": "Original horror monster that stalks players at night.",
+  "description": "A restrained hardcore-friendly horror stalker for Minecraft 1.21.1.",
   "entrypoints": {
     "main": [
       "com.voidwatcher.VoidWatcherMod"
