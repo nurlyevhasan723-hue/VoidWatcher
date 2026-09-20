@@ -141,6 +141,30 @@ location of your Java installation."
     fi
 fi
 
+# VoidWatcher is built for Java 21. If Codespaces exposes a newer default JDK
+# (for example Java 25), automatically prefer an installed Java 21 runtime.
+if [ -z "$JAVA_HOME" ] || ! "$JAVA_HOME/bin/java" -version 2>&1 | grep -q '"21'; then
+    for candidate in /usr/lib/jvm/*21* /usr/local/sdkman/candidates/java/21* /opt/java/*21*; do
+        if [ -x "$candidate/bin/java" ] && "$candidate/bin/java" -version 2>&1 | grep -q '"21'; then
+            export JAVA_HOME="$candidate"
+            break
+        fi
+    done
+fi
+
+if [ -n "$JAVA_HOME" ] && [ ! -x "$JAVA_HOME/bin/java" ]; then
+    die "ERROR: JAVA_HOME does not point to a valid Java installation: $JAVA_HOME"
+fi
+
+# Give a clear message instead of Gradle's opaque class-file error when no Java 21 is installed.
+if [ -n "$JAVA_HOME" ]; then
+    if ! "$JAVA_HOME/bin/java" -version 2>&1 | grep -q '"21'; then
+        die "ERROR: VoidWatcher requires Java 21. Install/select JDK 21, then rerun ./gradlew clean build."
+    fi
+else
+    die "ERROR: VoidWatcher requires Java 21. Install/select JDK 21, then rerun ./gradlew clean build."
+fi
+
 # Increase the maximum file descriptors if we can.
 if ! "$cygwin" && ! "$darwin" && ! "$nonstop" ; then
     case $MAX_FD in #(
