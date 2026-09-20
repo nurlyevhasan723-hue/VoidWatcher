@@ -1,21 +1,33 @@
-name: Build
+name: Build VoidWatcher
 
 on:
   push:
-  workflow_dispatch:
+    branches: ["main"]
+  pull_request:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 21
+          java-version: "21"
+          cache: gradle
 
-      - uses: gradle/actions/setup-gradle@v4
+      - name: Make Gradle executable
+        run: chmod +x ./gradlew
 
-      - run: ./gradlew build
+      - name: Build mod
+        run: ./gradlew clean build
+
+      - name: Upload JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: VoidWatcher
+          path: build/libs/*.jar
+          if-no-files-found: error
