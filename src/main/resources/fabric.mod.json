@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "voidwatcher",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "name": "Void Watcher",
   "description": "Original horror monster that stalks players at night.",
   "entrypoints": {
