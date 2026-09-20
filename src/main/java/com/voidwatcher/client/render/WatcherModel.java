@@ -14,7 +14,7 @@ public class WatcherModel extends GeoModel<WatcherEntity> {
 
     @Override
     public Identifier getTextureResource(WatcherEntity entity) {
-        return Identifier.of(VoidWatcherMod.MOD_ID, "textures/entity/Watcher.png");
+        return Identifier.of(VoidWatcherMod.MOD_ID, "textures/entity/watcher.png");
     }
 
     @Override
