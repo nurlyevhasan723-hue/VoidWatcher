@@ -25,6 +25,7 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
+import net.minecraft.state.property.Properties;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.math.BlockPos;
@@ -49,6 +50,8 @@ public class WatcherEntity extends HostileEntity implements GeoEntity {
             DataTracker.registerData(WatcherEntity.class, TrackedDataHandlerRegistry.BOOLEAN);
     private static final TrackedData<Boolean> ATTACKING =
             DataTracker.registerData(WatcherEntity.class, TrackedDataHandlerRegistry.BOOLEAN);
+    private static final TrackedData<Boolean> SPEAKING =
+            DataTracker.registerData(WatcherEntity.class, TrackedDataHandlerRegistry.BOOLEAN);
 
     private final AnimatableInstanceCache cache = new SingletonAnimatableInstanceCache(this);
 
@@ -60,10 +63,13 @@ public class WatcherEntity extends HostileEntity implements GeoEntity {
     private int effectCooldown;
     private int blockBreakCooldown;
     private int chatCooldown;
+    private int fakeStepCooldown;
     private int attackTicks;
     private int postAttackVanishTicks;
     private int dayObserveCooldown;
+    private int voiceTicks;
     private int encounterLevel;
+    private int adaptiveStage;
 
     public WatcherEntity(EntityType<? extends HostileEntity> entityType, World world) {
         super(entityType, world);
@@ -84,6 +90,7 @@ public class WatcherEntity extends HostileEntity implements GeoEntity {
         super.initDataTracker(builder);
         builder.add(STARING, false);
         builder.add(ATTACKING, false);
+        builder.add(SPEAKING, false);
     }
 
     @Override
@@ -110,25 +117,28 @@ public class WatcherEntity extends HostileEntity implements GeoEntity {
 
         tickTimers();
 
+        adaptiveStage = Math.min(10, (int) (world.getTime() / 24000L));
+
         if (postAttackVanishTicks > 0) {
             this.dataTracker.set(STARING, false);
             this.dataTracker.set(ATTACKING, false);
+            this.dataTracker.set(SPEAKING, false);
             this.setInvisible(true);
             this.setTarget(null);
             this.getNavigation().stop();
             this.setVelocity(Vec3d.ZERO);
 
-            if (postAttackVanishTicks % 10 == 0) {
+            if (postAttackVanishTicks % 8 == 0) {
                 world.spawnParticles(
                         ParticleTypes.LARGE_SMOKE,
                         this.getX(),
                         this.getY() + 1.0,
                         this.getZ(),
-                        5,
+                        7,
                         0.35,
                         0.7,
                         0.35,
-                        0.02
+                        0.025
                 );
             }
 
@@ -137,6 +147,19 @@ public class WatcherEntity extends HostileEntity implements GeoEntity {
 
         this.setInvisible(false);
 
+        PlayerEntity player = world.getClosestPlayer(this, 72.0);
+        if (player == null || !player.isAlive() || player.isSpectator()) {
+            this.dataTracker.set(STARING, false);
+            this.dataTracker.set(ATTACKING, false);
+            this.setTarget(null);
+            return;
+        }
+
+        if (!isNight(world)) {
+            dayObserve(world, player);
+            return;
+        }
+
         if (attackTicks > 0) {
             attackTicks--;
             this.dataTracker.set(ATTACKING, true);
@@ -144,17 +167,11 @@ public class WatcherEntity extends HostileEntity implements GeoEntity {
             this.dataTracker.set(ATTACKING, false);
         }
 
-        PlayerEntity player = world.getClosestPlayer(this, 72.0);
-        if (player == null || !player.isAlive() || player.isSpectator()) {
-            this.dataTracker.set(STARING, false);
-            this.setTarget(null);
-            return;
-        }
-
-        // Daytime is observation-only: no attacks, breaking, effects, weather/time manipulation or chase.
-        if (!isNight(world)) {
-            dayObserve(world, player);
-            return;
+        if (voiceTicks > 0) {
+            voiceTicks--;
+            this.dataTracker.set(SPEAKING, true);
+        } else {
+            this.dataTracker.set(SPEAKING, false);
         }
 
         double distance = this.distanceTo(player);
@@ -167,13 +184,13 @@ public class WatcherEntity extends HostileEntity implements GeoEntity {
             this.setVelocity(Vec3d.ZERO);
             this.getLookControl().lookAt(player, 40.0F, 40.0F);
 
-            if (stareTicks == 1 || stareTicks % 50 == 0) {
+            if (stareTicks == 1 || stareTicks % Math.max(22, 50 - adaptiveStage * 2) == 0) {
                 world.playSound(
                         null,
                         this.getBlockPos(),
                         SoundEvents.ENTITY_WARDEN_HEARTBEAT,
                         SoundCategory.HOSTILE,
-                        0.65F,
+                        0.65F + adaptiveStage * 0.02F,
                         0.55F + world.getRandom().nextFloat() * 0.18F
                 );
             }
@@ -182,7 +199,7 @@ public class WatcherEntity extends HostileEntity implements GeoEntity {
                 vanishBehindPlayer(world, player);
                 encounterLevel++;
                 stareTicks = 0;
-                vanishCooldown = 80;
+                vanishCooldown = Math.max(38, 80 - adaptiveStage * 3);
                 triggerTerror(world, player, true);
                 return;
             }
@@ -190,43 +207,48 @@ public class WatcherEntity extends HostileEntity implements GeoEntity {
             stareTicks = Math.max(0, stareTicks - 3);
             this.setTarget(player);
 
-            double speed = 1.15 + Math.min(encounterLevel, 6) * 0.06;
+            double speed = 1.15 + adaptiveStage * 0.05 + Math.min(encounterLevel, 8) * 0.065;
             if (distance > 2.8) {
                 this.getNavigation().startMovingTo(player, speed);
             } else {
                 this.getNavigation().stop();
-                tryBreakNearbyDoor(world);
+                openOrBreakNearbyDoor(world);
             }
         }
 
-        if (distance < 30.0) {
+        if (distance < 34.0) {
             if (ambienceCooldown == 0) {
-                ambienceCooldown = 55 + world.getRandom().nextInt(90);
+                ambienceCooldown = Math.max(28, 55 + world.getRandom().nextInt(90) - adaptiveStage * 4);
                 playHorrorSound(world);
             }
 
+            if (fakeStepCooldown == 0 && distance > 9.0 && distance < 28.0) {
+                fakeStepCooldown = Math.max(35, 95 - adaptiveStage * 5);
+                playFakeFootstep(world, player);
+            }
+
             if (effectCooldown == 0 && distance < 16.0) {
-                effectCooldown = 55 + world.getRandom().nextInt(45);
+                effectCooldown = Math.max(26, 55 + world.getRandom().nextInt(45) - adaptiveStage * 3);
                 tormentPlayer(player);
             }
 
             if (terrorCooldown == 0 && distance < 13.0) {
-                terrorCooldown = 120 + world.getRandom().nextInt(120);
+                terrorCooldown = Math.max(60, 120 + world.getRandom().nextInt(120) - adaptiveStage * 6);
                 triggerTerror(world, player, false);
             }
 
             if (environmentCooldown == 0 && distance < 36.0) {
-                environmentCooldown = 240;
+                environmentCooldown = Math.max(100, 240 - adaptiveStage * 10);
                 distortEnvironment(world);
             }
 
             if (chatCooldown == 0 && distance < 20.0) {
-                chatCooldown = 140 + world.getRandom().nextInt(120);
+                chatCooldown = Math.max(70, 140 + world.getRandom().nextInt(120) - adaptiveStage * 5);
                 sendHorrorMessage((ServerPlayerEntity) player);
             }
 
             if (blockBreakCooldown == 0) {
-                blockBreakCooldown = 5;
+                blockBreakCooldown = Math.max(3, 5 - adaptiveStage / 3);
                 breakAnythingButObsidian(world, player);
             }
         }
@@ -237,7 +259,7 @@ public class WatcherEntity extends HostileEntity implements GeoEntity {
                     this.getX(),
                     this.getY() + 1.0,
                     this.getZ(),
-                    1 + Math.min(encounterLevel, 4),
+                    1 + Math.min(5, encounterLevel / 2 + adaptiveStage / 2),
                     0.22,
                     0.45,
                     0.22,
@@ -245,13 +267,13 @@ public class WatcherEntity extends HostileEntity implements GeoEntity {
             );
         }
 
-        if (this.age % 7 == 0 && distance < 18.0) {
+        if (this.age % 7 == 0 && distance < 22.0) {
             world.spawnParticles(
                     ParticleTypes.PORTAL,
                     this.getX(),
                     this.getY() + 1.3,
                     this.getZ(),
-                    4,
+                    4 + adaptiveStage / 2,
                     0.35,
                     0.7,
                     0.35,
@@ -268,6 +290,7 @@ public class WatcherEntity extends HostileEntity implements GeoEntity {
     private void dayObserve(ServerWorld world, PlayerEntity player) {
         this.setTarget(null);
         this.dataTracker.set(ATTACKING, false);
+        this.dataTracker.set(SPEAKING, false);
         this.getNavigation().stop();
         this.setVelocity(Vec3d.ZERO);
         this.getLookControl().lookAt(player, 20.0F, 20.0F);
@@ -276,22 +299,42 @@ public class WatcherEntity extends HostileEntity implements GeoEntity {
         this.dataTracker.set(STARING, lookingAtMe);
 
         double distance = this.distanceTo(player);
-        if (dayObserveCooldown == 0 && (distance < 18.0 || distance > 52.0 || world.getRandom().nextInt(180) == 0)) {
-            dayObserveCooldown = 80;
+        if (dayObserveCooldown == 0 && (distance < 18.0 || distance > 52.0 || world.getRandom().nextInt(120 - adaptiveStage * 4) == 0)) {
+            dayObserveCooldown = Math.max(45, 90 - adaptiveStage * 4);
             moveToObservationPoint(world, player);
         }
 
-        if (this.age % 20 == 0 && distance < 60.0) {
+        if (this.age % 16 == 0 && distance < 64.0) {
             world.spawnParticles(
-                    ParticleTypes.SMOKE,
+                    ParticleTypes.CAMPFIRE_COSY_SMOKE,
                     this.getX(),
                     this.getY() + 0.9,
                     this.getZ(),
-                    1,
+                    1 + adaptiveStage / 4,
                     0.1,
                     0.2,
                     0.1,
                     0.002
+            );
+        }
+
+        // Rare daylight disappearance: it slips into the haze rather than attacking.
+        if (distance < 14.0 && world.getRandom().nextInt(Math.max(60, 150 - adaptiveStage * 8)) == 0) {
+            world.spawnParticles(
+                    ParticleTypes.LARGE_SMOKE,
+                    this.getX(),
+                    this.getY() + 1.0,
+                    this.getZ(),
+                    24,
+                    0.5,
+                    0.8,
+                    0.5,
+                    0.03
+            );
+            this.requestTeleport(
+                    player.getX() + (world.getRandom().nextDouble() - 0.5) * 70.0,
+                    player.getY(),
+                    player.getZ() + (world.getRandom().nextDouble() - 0.5) * 70.0
             );
         }
     }
@@ -299,7 +342,7 @@ public class WatcherEntity extends HostileEntity implements GeoEntity {
     private void moveToObservationPoint(ServerWorld world, PlayerEntity player) {
         for (int i = 0; i < 14; i++) {
             double angle = world.getRandom().nextDouble() * Math.PI * 2.0;
-            double distance = 28.0 + world.getRandom().nextDouble() * 14.0;
+            double distance = 28.0 + world.getRandom().nextDouble() * 18.0;
             int x = (int) Math.floor(player.getX() + Math.cos(angle) * distance);
             int z = (int) Math.floor(player.getZ() + Math.sin(angle) * distance);
             int y = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, x, z);
@@ -328,22 +371,22 @@ public class WatcherEntity extends HostileEntity implements GeoEntity {
         if (effectCooldown > 0) effectCooldown--;
         if (blockBreakCooldown > 0) blockBreakCooldown--;
         if (chatCooldown > 0) chatCooldown--;
-        if (dayObserveCooldown > 0) dayObserveCooldown--;
+        if (fakeStepCooldown > 0) fakeStepCooldown--;
     }
 
     private boolean isBeingWatched(PlayerEntity player) {
         Vec3d toWatcher = this.getEyePos().subtract(player.getEyePos()).normalize();
         Vec3d look = player.getRotationVec(1.0F).normalize();
         double dot = look.dotProduct(toWatcher);
-        return dot > 0.90 && player.canSee(this);
+        return dot > Math.max(0.84, 0.90 - adaptiveStage * 0.006) && player.canSee(this);
     }
 
     private void tormentPlayer(PlayerEntity player) {
-        player.addStatusEffect(new StatusEffectInstance(StatusEffects.BLINDNESS, 55, 0));
-        player.addStatusEffect(new StatusEffectInstance(StatusEffects.NAUSEA, 85, 0));
+        player.addStatusEffect(new StatusEffectInstance(StatusEffects.BLINDNESS, 55 + adaptiveStage * 2, 0));
+        player.addStatusEffect(new StatusEffectInstance(StatusEffects.NAUSEA, 85 + adaptiveStage * 2, 0));
 
-        if (this.getWorld().getRandom().nextInt(3) == 0) {
-            player.addStatusEffect(new StatusEffectInstance(StatusEffects.DARKNESS, 45, 0));
+        if (this.getWorld().getRandom().nextInt(Math.max(2, 4 - adaptiveStage / 3)) == 0) {
+            player.addStatusEffect(new StatusEffectInstance(StatusEffects.DARKNESS, 45 + adaptiveStage * 2, 0));
         }
     }
 
@@ -383,17 +426,38 @@ public class WatcherEntity extends HostileEntity implements GeoEntity {
         }
     }
 
+    private void playFakeFootstep(ServerWorld world, PlayerEntity player) {
+        Vec3d look = player.getRotationVec(1.0F);
+        Vec3d behind = new Vec3d(-look.x, 0.0, -look.z);
+        if (behind.lengthSquared() < 0.01) {
+            behind = new Vec3d(0.0, 0.0, 1.0);
+        } else {
+            behind = behind.normalize();
+        }
+
+        double distance = 4.0 + world.getRandom().nextDouble() * 4.0;
+        BlockPos soundPos = BlockPos.ofFloored(player.getPos().add(behind.multiply(distance)));
+        world.playSound(
+                null,
+                soundPos,
+                world.getRandom().nextBoolean() ? SoundEvents.BLOCK_STONE_STEP : SoundEvents.BLOCK_CHAIN_STEP,
+                SoundCategory.HOSTILE,
+                0.75F + adaptiveStage * 0.02F,
+                0.55F + world.getRandom().nextFloat() * 0.25F
+        );
+    }
+
     private void distortEnvironment(ServerWorld world) {
         long current = world.getTimeOfDay() % 24000L;
         long night = 13500L + world.getRandom().nextInt(7000);
         if (current < 13000L || current > 23000L) {
             world.setTimeOfDay(night);
-        } else if (world.getRandom().nextInt(3) == 0) {
+        } else if (world.getRandom().nextInt(Math.max(2, 4 - adaptiveStage / 3)) == 0) {
             world.setTimeOfDay(night);
         }
 
         boolean thunder = world.getRandom().nextBoolean();
-        world.setWeather(0, 900, true, thunder);
+        world.setWeather(0, Math.max(500, 900 - adaptiveStage * 20), true, thunder);
     }
 
     private void sendHorrorMessage(ServerPlayerEntity player) {
@@ -415,6 +479,9 @@ public class WatcherEntity extends HostileEntity implements GeoEntity {
                 Text.literal("[VOID] " + message).formatted(Formatting.DARK_RED, Formatting.BOLD),
                 false
         );
+
+        voiceTicks = 42;
+        dataTracker.set(SPEAKING, true);
 
         world.playSound(
                 null,
@@ -547,11 +614,7 @@ public class WatcherEntity extends HostileEntity implements GeoEntity {
         this.requestTeleport(baseX, player.getY(), baseZ);
     }
 
-    private void tryBreakNearbyDoor(ServerWorld world) {
-        if (!isNight(world)) {
-            return;
-        }
-
+    private void openOrBreakNearbyDoor(ServerWorld world) {
         BlockPos origin = this.getBlockPos();
         BlockPos.Mutable pos = new BlockPos.Mutable();
 
@@ -559,18 +622,35 @@ public class WatcherEntity extends HostileEntity implements GeoEntity {
             for (int dy = 0; dy <= 1; dy++) {
                 for (int dz = -1; dz <= 1; dz++) {
                     pos.set(origin.getX() + dx, origin.getY() + dy, origin.getZ() + dz);
-                    if (world.getBlockState(pos).isIn(BlockTags.DOORS)) {
-                        world.breakBlock(pos, true, this);
+                    BlockState state = world.getBlockState(pos);
+
+                    if (!state.isIn(BlockTags.DOORS)) {
+                        continue;
+                    }
+
+                    if (state.contains(Properties.OPEN) && !state.get(Properties.OPEN)) {
+                        world.setBlockState(pos, state.with(Properties.OPEN, true), Block.NOTIFY_ALL);
                         world.playSound(
                                 null,
                                 pos,
-                                SoundEvents.BLOCK_WOOD_BREAK,
+                                SoundEvents.BLOCK_WOODEN_DOOR_OPEN,
                                 SoundCategory.HOSTILE,
-                                0.95F,
-                                0.55F
+                                1.0F,
+                                0.65F
                         );
                         return;
                     }
+
+                    world.breakBlock(pos, true, this);
+                    world.playSound(
+                            null,
+                            pos,
+                            SoundEvents.BLOCK_WOOD_BREAK,
+                            SoundCategory.HOSTILE,
+                            0.95F,
+                            0.55F
+                    );
+                    return;
                 }
             }
         }
@@ -592,7 +672,7 @@ public class WatcherEntity extends HostileEntity implements GeoEntity {
                 player.addStatusEffect(new StatusEffectInstance(StatusEffects.NAUSEA, 55, 0));
                 speak(world, (ServerPlayerEntity) player, 2, "БЕГИ");
 
-                postAttackVanishTicks = 240;
+                postAttackVanishTicks = Math.max(180, 240 - adaptiveStage * 6);
                 this.setInvisible(true);
                 this.setTarget(null);
                 this.getNavigation().stop();
@@ -646,11 +726,20 @@ public class WatcherEntity extends HostileEntity implements GeoEntity {
         return this.dataTracker.get(ATTACKING);
     }
 
+    public boolean isSpeaking() {
+        return this.dataTracker.get(SPEAKING);
+    }
+
+    public int getAdaptiveStage() {
+        return adaptiveStage;
+    }
+
     @Override
     public void writeCustomDataToNbt(NbtCompound nbt) {
         super.writeCustomDataToNbt(nbt);
         nbt.putInt("VoidWatcherEncounters", encounterLevel);
         nbt.putInt("VoidWatcherVanish", postAttackVanishTicks);
+        nbt.putInt("VoidWatcherAdaptiveStage", adaptiveStage);
     }
 
     @Override
@@ -658,6 +747,7 @@ public class WatcherEntity extends HostileEntity implements GeoEntity {
         super.readCustomDataFromNbt(nbt);
         encounterLevel = nbt.getInt("VoidWatcherEncounters");
         postAttackVanishTicks = nbt.getInt("VoidWatcherVanish");
+        adaptiveStage = nbt.getInt("VoidWatcherAdaptiveStage");
         this.setInvisible(postAttackVanishTicks > 0);
     }
 
@@ -668,6 +758,9 @@ public class WatcherEntity extends HostileEntity implements GeoEntity {
                 "controller",
                 2,
                 state -> {
+                    if (this.dataTracker.get(SPEAKING)) {
+                        return state.setAndContinue(RawAnimation.begin().thenLoop("talk"));
+                    }
                     if (this.dataTracker.get(ATTACKING)) {
                         return state.setAndContinue(RawAnimation.begin().thenPlay("attack"));
                     }
