@@ -21,13 +21,13 @@ public final class VoidWatcherSpawner {
     private static void tick(ServerWorld world) {
         long time = world.getTimeOfDay() % 24000L;
 
-        // Whole night: roughly sunset -> sunrise.
+        // Active only during the full night.
         if (time < 13000L || time >= 23000L) {
             return;
         }
 
-        // Frequent encounters all night, but capped per player to keep the world playable.
-        if (world.getRandom().nextInt(180) != 0) {
+        // Rare enough for Hardcore, but frequent enough to make nights unsafe.
+        if (world.getRandom().nextInt(420) != 0) {
             return;
         }
 
@@ -36,13 +36,15 @@ public final class VoidWatcherSpawner {
                 continue;
             }
 
+            // One active Watcher per player keeps the encounter scary without turning
+            // the world into a permanent mob swarm.
             int watcherCount = world.getEntitiesByType(
                     ModEntities.WATCHER,
                     player.getBoundingBox().expand(96.0),
                     entity -> entity.isAlive()
             ).size();
 
-            if (watcherCount >= 3) {
+            if (watcherCount > 0) {
                 continue;
             }
 
@@ -69,10 +71,10 @@ public final class VoidWatcherSpawner {
             world.playSound(
                     null,
                     spawnPos,
-                    net.minecraft.sound.SoundEvents.ENTITY_WARDEN_EMERGE,
+                    net.minecraft.sound.SoundEvents.ENTITY_PHANTOM_FLAP,
                     net.minecraft.sound.SoundCategory.HOSTILE,
-                    0.8F,
-                    0.55F
+                    0.65F,
+                    0.42F
             );
             return;
         }
@@ -88,9 +90,9 @@ public final class VoidWatcherSpawner {
             behind = behind.normalize();
         }
 
-        for (int i = 0; i < 20; i++) {
-            double distance = 14.0 + world.getRandom().nextDouble() * 14.0;
-            double side = (world.getRandom().nextDouble() - 0.5) * 14.0;
+        for (int i = 0; i < 24; i++) {
+            double distance = 16.0 + world.getRandom().nextDouble() * 12.0;
+            double side = (world.getRandom().nextDouble() - 0.5) * 10.0;
 
             int x = (int) Math.floor(player.getX() + behind.x * distance + look.z * side);
             int z = (int) Math.floor(player.getZ() + behind.z * distance - look.x * side);
