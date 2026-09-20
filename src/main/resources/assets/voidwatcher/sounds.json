@@ -1,0 +1,26 @@
+{
+  "voice_no_turn": {
+    "sounds": ["voidwatcher:voice/no_turn"]
+  },
+  "voice_watches": {
+    "sounds": ["voidwatcher:voice/watches"]
+  },
+  "voice_run": {
+    "sounds": ["voidwatcher:voice/run"]
+  },
+  "voice_alone": {
+    "sounds": ["voidwatcher:voice/alone"]
+  },
+  "voice_dont_see": {
+    "sounds": ["voidwatcher:voice/dont_see"]
+  },
+  "voice_near": {
+    "sounds": ["voidwatcher:voice/near"]
+  },
+  "voice_breathing": {
+    "sounds": ["voidwatcher:voice/breathing"]
+  },
+  "voice_hears": {
+    "sounds": ["voidwatcher:voice/hears"]
+  }
+}
