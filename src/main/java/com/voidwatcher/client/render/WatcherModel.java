@@ -2,7 +2,6 @@ package com.voidwatcher.client.render;
 
 import com.voidwatcher.VoidWatcherMod;
 import com.voidwatcher.entity.WatcherEntity;
-
 import net.minecraft.util.Identifier;
 import software.bernie.geckolib.model.GeoModel;
 
@@ -15,7 +14,7 @@ public class WatcherModel extends GeoModel<WatcherEntity> {
 
     @Override
     public Identifier getTextureResource(WatcherEntity entity) {
-        return Identifier.of(VoidWatcherMod.MOD_ID, "textures/entity/watcher.png");
+        return Identifier.of(VoidWatcherMod.MOD_ID, "textures/entity/Watcher.png");
     }
 
     @Override
