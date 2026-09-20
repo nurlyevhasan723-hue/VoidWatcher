@@ -3,7 +3,6 @@ package com.voidwatcher.system;
 import com.voidwatcher.entity.WatcherEntity;
 import com.voidwatcher.registry.ModEntities;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
-import net.minecraft.registry.tag.BlockTags;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
@@ -21,11 +20,14 @@ public final class VoidWatcherSpawner {
 
     private static void tick(ServerWorld world) {
         long time = world.getTimeOfDay() % 24000L;
-        if (time < 18000L || time >= 22000L) {
+
+        // Whole night: roughly sunset -> sunrise.
+        if (time < 13000L || time >= 23000L) {
             return;
         }
 
-        if (world.getRandom().nextInt(1600) != 0) {
+        // Frequent encounters all night, but capped per player to keep the world playable.
+        if (world.getRandom().nextInt(180) != 0) {
             return;
         }
 
@@ -34,15 +36,17 @@ public final class VoidWatcherSpawner {
                 continue;
             }
 
-            if (!world.getEntitiesByType(
+            int watcherCount = world.getEntitiesByType(
                     ModEntities.WATCHER,
-                    player.getBoundingBox().expand(64.0),
+                    player.getBoundingBox().expand(96.0),
                     entity -> entity.isAlive()
-            ).isEmpty()) {
+            ).size();
+
+            if (watcherCount >= 3) {
                 continue;
             }
 
-            BlockPos spawnPos = findForestSpawn(world, player);
+            BlockPos spawnPos = findNightSpawn(world, player);
             if (spawnPos == null) {
                 continue;
             }
@@ -65,7 +69,7 @@ public final class VoidWatcherSpawner {
             world.playSound(
                     null,
                     spawnPos,
-                    net.minecraft.sound.SoundEvents.ENTITY_PHANTOM_AMBIENT,
+                    net.minecraft.sound.SoundEvents.ENTITY_WARDEN_EMERGE,
                     net.minecraft.sound.SoundCategory.HOSTILE,
                     0.8F,
                     0.55F
@@ -74,30 +78,33 @@ public final class VoidWatcherSpawner {
         }
     }
 
-    private static BlockPos findForestSpawn(ServerWorld world, ServerPlayerEntity player) {
+    private static BlockPos findNightSpawn(ServerWorld world, ServerPlayerEntity player) {
         Vec3d look = player.getRotationVec(1.0F);
         Vec3d behind = new Vec3d(-look.x, 0.0, -look.z);
+
         if (behind.lengthSquared() < 0.01) {
             behind = new Vec3d(0.0, 0.0, 1.0);
         } else {
             behind = behind.normalize();
         }
 
-        for (int i = 0; i < 12; i++) {
-            double distance = 9.0 + world.getRandom().nextDouble() * 10.0;
-            double jitter = (world.getRandom().nextDouble() - 0.5) * 8.0;
-            int x = (int) Math.floor(player.getX() + behind.x * distance + jitter);
-            int z = (int) Math.floor(player.getZ() + behind.z * distance + jitter);
+        for (int i = 0; i < 20; i++) {
+            double distance = 14.0 + world.getRandom().nextDouble() * 14.0;
+            double side = (world.getRandom().nextDouble() - 0.5) * 14.0;
 
-            BlockPos column = new BlockPos(x, player.getBlockY(), z);
-            if (!world.getWorldBorder().contains(column)) {
+            int x = (int) Math.floor(player.getX() + behind.x * distance + look.z * side);
+            int z = (int) Math.floor(player.getZ() + behind.z * distance - look.x * side);
+
+            if (!world.getWorldBorder().contains(new BlockPos(x, player.getBlockY(), z))) {
                 continue;
             }
 
             int y = world.getTopY(Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, x, z);
             BlockPos pos = new BlockPos(x, y, z);
 
-            if (!world.getBlockState(pos).isAir() || !world.getBlockState(pos.up()).isAir()) {
+            if (!world.getBlockState(pos).isAir()
+                    || !world.getBlockState(pos.up()).isAir()
+                    || !world.getBlockState(pos.up(2)).isAir()) {
                 continue;
             }
 
@@ -106,28 +113,9 @@ public final class VoidWatcherSpawner {
                 continue;
             }
 
-            if (!hasTreeCover(world, pos)) {
-                continue;
-            }
-
             return pos;
         }
 
         return null;
-    }
-
-    private static boolean hasTreeCover(ServerWorld world, BlockPos center) {
-        BlockPos.Mutable mutable = new BlockPos.Mutable();
-        for (int dx = -4; dx <= 4; dx++) {
-            for (int dy = 1; dy <= 5; dy++) {
-                for (int dz = -4; dz <= 4; dz++) {
-                    mutable.set(center.getX() + dx, center.getY() + dy, center.getZ() + dz);
-                    if (world.getBlockState(mutable).isIn(BlockTags.LEAVES)) {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
     }
 }
