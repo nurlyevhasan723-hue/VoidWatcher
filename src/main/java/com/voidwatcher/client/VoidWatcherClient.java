@@ -29,7 +29,6 @@ public class VoidWatcherClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         EntityRendererRegistry.register(ModEntities.WATCHER, WatcherRenderer::new);
-
         ClientTickEvents.END_CLIENT_TICK.register(VoidWatcherClient::tick);
         HudRenderCallback.EVENT.register(VoidWatcherClient::renderScare);
     }
@@ -47,7 +46,7 @@ public class VoidWatcherClient implements ClientModInitializer {
             return;
         }
 
-        Box box = client.player.getBoundingBox().expand(18.0);
+        Box box = client.player.getBoundingBox().expand(24.0);
         List<WatcherEntity> watchers = client.world.getEntitiesByType(
                 ModEntities.WATCHER,
                 box,
@@ -65,24 +64,35 @@ public class VoidWatcherClient implements ClientModInitializer {
             }
         }
 
+        // The Watcher creates a cold mist / static feel even before the hard scare.
+        if (nearest != null && nearestDistance < 15.0 && scareCooldown <= 0
+                && client.world.getRandom().nextInt(180) == 0) {
+            scareText = "ВОЗДУХ СТАЛ СЛИШКОМ ТИХИМ";
+            scareType = 5;
+            scareTicks = 8;
+            flicker = 0;
+        }
+
         if (nearest == null || scareCooldown > 0) {
             return;
         }
 
         boolean hardTrigger = nearestDistance < 4.5 && nearest.isAttackingAnimation();
+        boolean talkingTrigger = nearestDistance < 12.0 && nearest.isSpeaking();
         boolean stareTrigger = nearestDistance < 10.0 && nearest.isStaring();
 
-        if (hardTrigger || (stareTrigger && client.world.getRandom().nextInt(90) == 0)
-                || (nearestDistance < 4.5 && client.world.getRandom().nextInt(55) == 0)) {
+        if (hardTrigger || talkingTrigger
+                || (stareTrigger && client.world.getRandom().nextInt(75) == 0)
+                || (nearestDistance < 4.5 && client.world.getRandom().nextInt(45) == 0)) {
             triggerScare(client, nearestDistance < 5.0);
         }
     }
 
     private static void triggerScare(MinecraftClient client, boolean violent) {
-        scareTicks = violent ? 30 : 20;
-        scareCooldown = violent ? 100 : 70;
+        scareTicks = violent ? 34 : 23;
+        scareCooldown = violent ? 110 : 72;
         flicker = 0;
-        scareType = client.world.getRandom().nextInt(6);
+        scareType = client.world.getRandom().nextInt(7);
 
         scareText = switch (scareType) {
             case 0 -> "НЕ ОБОРАЧИВАЙСЯ";
@@ -90,6 +100,7 @@ public class VoidWatcherClient implements ClientModInitializer {
             case 2 -> "БЕГИ";
             case 3 -> "ТЫ УЖЕ НЕ ОДИН";
             case 4 -> "ОН УЖЕ РЯДОМ";
+            case 5 -> "ОН ДЫШИТ ЗА ТВОЕЙ СПИНОЙ";
             default -> "ОН СЛЫШИТ ТЕБЯ";
         };
 
@@ -109,7 +120,7 @@ public class VoidWatcherClient implements ClientModInitializer {
 
     private static void renderScare(DrawContext context, RenderTickCounter tickCounter) {
         MinecraftClient client = MinecraftClient.getInstance();
-        if (client.world == null || client.player == null || scareTicks <= 0) {
+        if (client.world == null || client.player == null) {
             return;
         }
 
@@ -117,29 +128,83 @@ public class VoidWatcherClient implements ClientModInitializer {
         int height = client.getWindow().getScaledHeight();
         int centerX = width / 2;
         int centerY = height / 2;
-        int alpha = Math.min(220, 65 + scareTicks * 6);
 
-        switch (scareType) {
-            case 0 -> renderEyes(context, width, height, centerX, centerY, alpha);
-            case 1 -> renderStatic(context, width, height, alpha);
-            case 2 -> renderBlood(context, width, height, alpha);
-            case 3 -> renderMouth(context, width, height, centerX, centerY, alpha);
-            case 4 -> renderVoid(context, width, height, centerX, centerY, alpha);
-            default -> renderGlitch(context, width, height, alpha);
+        if (scareTicks > 0) {
+            int alpha = Math.min(230, 70 + scareTicks * 6);
+
+            switch (scareType) {
+                case 0 -> renderEyes(context, width, height, centerX, centerY, alpha);
+                case 1 -> renderStatic(context, width, height, alpha);
+                case 2 -> renderBlood(context, width, height, alpha);
+                case 3 -> renderMouth(context, width, height, centerX, centerY, alpha);
+                case 4 -> renderVoid(context, width, height, centerX, centerY, alpha);
+                case 5 -> renderFace(context, width, height, centerX, centerY, alpha);
+                default -> renderGlitch(context, width, height, alpha);
+            }
+
+            context.drawCenteredTextWithShadow(
+                    client.textRenderer,
+                    Text.literal(scareText).formatted(Formatting.DARK_RED, Formatting.BOLD),
+                    centerX,
+                    height - 42,
+                    0xFFFFFFFF
+            );
         }
 
-        context.drawCenteredTextWithShadow(
-                client.textRenderer,
-                Text.literal(scareText).formatted(Formatting.DARK_RED, Formatting.BOLD),
-                centerX,
-                height - 42,
-                0xFFFFFFFF
-        );
+        if (nearestWatcherNear(client)) {
+            renderColdMist(context, width, height);
+        }
+    }
+
+    private static boolean nearestWatcherNear(MinecraftClient client) {
+        Box box = client.player.getBoundingBox().expand(20.0);
+        return !client.world.getEntitiesByType(
+                ModEntities.WATCHER,
+                box,
+                entity -> entity.isAlive()
+        ).isEmpty();
+    }
+
+    private static void renderColdMist(DrawContext context, int width, int height) {
+        int alpha = 35 + (flicker % 8) * 3;
+        context.fill(0, 0, width, height, (alpha << 24) | 0xDDE5E8);
+
+        for (int i = 0; i < 12; i++) {
+            int y = (i * 71 + flicker * 3) % Math.max(1, height);
+            int x = (i * 113 + flicker * 5) % Math.max(1, width);
+            int w = 120 + ((i * 31) % Math.max(60, width / 3));
+            context.fill(x, y, Math.min(width, x + w), y + 10, 0x14000000);
+        }
+    }
+
+    private static void renderFace(DrawContext context, int width, int height, int cx, int cy, int alpha) {
+        context.fill(0, 0, width, height, (alpha << 24) | 0x080808);
+        int faceW = Math.min(width - 20, 620);
+        int faceH = Math.min(height - 30, 520);
+        int left = cx - faceW / 2;
+        int top = cy - faceH / 2;
+
+        context.fill(left, top, left + faceW, top + faceH, 0xE90B0B0D);
+        context.fill(left + 65, top + 80, left + faceW - 65, top + 125, 0xFFDDDDD6);
+        context.fill(left + 110, top + faceH - 170, left + faceW - 110, top + faceH - 75, 0xFF020203);
+
+        for (int x = left + 85; x < left + faceW - 85; x += 30) {
+            context.fill(x, top + faceH - 170, x + 13, top + faceH - 116, 0xFFE5E0D3);
+        }
+
+        context.fill(cx - 15, top + 85, cx + 15, top + 120, 0xFF6D0000);
+        context.fill(cx - 9, top + faceH - 155, cx + 9, top + faceH - 90, 0xFF7A0000);
+
+        for (int i = 0; i < 14; i++) {
+            int y = top + 15 + i * 34;
+            int x = left + 20 + (i * 41 + flicker * 9) % Math.max(1, faceW - 80);
+            context.fill(x, y, Math.min(left + faceW - 10, x + 24 + i * 3), y + 3, 0x50B0B0B0);
+        }
     }
 
     private static void renderEyes(DrawContext context, int width, int height, int cx, int cy, int alpha) {
         context.fill(0, 0, width, height, (alpha << 24) | 0x130000);
-        int eyeWidth = Math.min(width / 2, 280);
+        int eyeWidth = Math.min(width / 2, 300);
         context.fill(cx - eyeWidth / 2, cy - 20, cx - 20, cy + 20, 0xFFE6E6E0);
         context.fill(cx + 20, cy - 20, cx + eyeWidth / 2, cy + 20, 0xFFE6E6E0);
         context.fill(cx - 7, cy - 12, cx + 7, cy + 12, 0xFF5A0000);
@@ -172,7 +237,7 @@ public class VoidWatcherClient implements ClientModInitializer {
 
     private static void renderMouth(DrawContext context, int width, int height, int cx, int cy, int alpha) {
         context.fill(0, 0, width, height, (alpha << 24) | 0x040404);
-        int mw = Math.min(width - 80, 460);
+        int mw = Math.min(width - 80, 520);
         int mh = 90 + (flicker % 20);
         context.fill(cx - mw / 2, cy - mh / 2, cx + mw / 2, cy + mh / 2, 0xEE050505);
         for (int x = cx - mw / 2 + 10; x < cx + mw / 2 - 10; x += 24) {
@@ -182,10 +247,10 @@ public class VoidWatcherClient implements ClientModInitializer {
 
     private static void renderVoid(DrawContext context, int width, int height, int cx, int cy, int alpha) {
         context.fill(0, 0, width, height, (alpha << 24) | 0x000000);
-        int r = Math.min(160, 60 + scareTicks * 4);
+        int r = Math.min(180, 70 + scareTicks * 4);
         context.fill(cx - r, cy - r, cx + r, cy + r, 0xE8090909);
-        context.fill(cx - 12, cy - 75, cx + 12, cy + 75, 0xFFE00000);
-        context.fill(cx - 75, cy - 12, cx + 75, cy + 12, 0xFFE00000);
+        context.fill(cx - 12, cy - 80, cx + 12, cy + 80, 0xFFE00000);
+        context.fill(cx - 80, cy - 12, cx + 80, cy + 12, 0xFFE00000);
     }
 
     private static void renderGlitch(DrawContext context, int width, int height, int alpha) {
