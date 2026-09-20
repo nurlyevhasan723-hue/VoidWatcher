@@ -9,6 +9,9 @@ import net.minecraft.entity.ai.goal.RevengeGoal;
 import net.minecraft.entity.ai.goal.WanderAroundFarGoal;
 import net.minecraft.entity.attribute.DefaultAttributeContainer;
 import net.minecraft.entity.attribute.EntityAttributes;
+import net.minecraft.entity.data.DataTracker;
+import net.minecraft.entity.data.TrackedData;
+import net.minecraft.entity.data.TrackedDataHandlerRegistry;
 import net.minecraft.entity.mob.HostileEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.nbt.NbtCompound;
@@ -31,6 +34,9 @@ import software.bernie.geckolib.animation.RawAnimation;
 
 public class WatcherEntity extends HostileEntity implements GeoEntity {
 
+    private static final TrackedData<Boolean> STARING =
+            DataTracker.registerData(WatcherEntity.class, TrackedDataHandlerRegistry.BOOLEAN);
+
     private final AnimatableInstanceCache cache = new SingletonAnimatableInstanceCache(this);
 
     private int stareTicks;
@@ -50,6 +56,12 @@ public class WatcherEntity extends HostileEntity implements GeoEntity {
                 .add(EntityAttributes.GENERIC_MOVEMENT_SPEED, 0.30)
                 .add(EntityAttributes.GENERIC_FOLLOW_RANGE, 64.0)
                 .add(EntityAttributes.GENERIC_KNOCKBACK_RESISTANCE, 1.0);
+    }
+
+    @Override
+    protected void initDataTracker(DataTracker.Builder builder) {
+        super.initDataTracker(builder);
+        builder.add(STARING, false);
     }
 
     @Override
@@ -83,11 +95,13 @@ public class WatcherEntity extends HostileEntity implements GeoEntity {
 
         PlayerEntity player = world.getClosestPlayer(this, 48.0);
         if (player == null || !player.isAlive() || player.isSpectator()) {
+            this.dataTracker.set(STARING, false);
             return;
         }
 
         double distance = this.distanceTo(player);
         boolean beingWatched = isBeingWatched(player);
+        this.dataTracker.set(STARING, beingWatched);
 
         if (beingWatched) {
             stareTicks++;
@@ -235,7 +249,14 @@ public class WatcherEntity extends HostileEntity implements GeoEntity {
                     pos.set(origin.getX() + dx, origin.getY() + dy, origin.getZ() + dz);
                     if (world.getBlockState(pos).isIn(BlockTags.DOORS)) {
                         world.breakBlock(pos, true, this);
-                        world.playSound(null, pos, SoundEvents.BLOCK_WOODEN_DOOR_BREAK, SoundCategory.HOSTILE, 0.9F, 0.65F);
+                        world.playSound(
+                                null,
+                                pos,
+                                SoundEvents.BLOCK_WOODEN_DOOR_BREAK,
+                                SoundCategory.HOSTILE,
+                                0.9F,
+                                0.65F
+                        );
                         return;
                     }
                 }
@@ -262,6 +283,9 @@ public class WatcherEntity extends HostileEntity implements GeoEntity {
                 "controller",
                 4,
                 state -> {
+                    if (this.dataTracker.get(STARING)) {
+                        return state.setAndContinue(RawAnimation.begin().thenLoop("stare"));
+                    }
                     if (state.isMoving()) {
                         return state.setAndContinue(RawAnimation.begin().thenLoop("walk"));
                     }
