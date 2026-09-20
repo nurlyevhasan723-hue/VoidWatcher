@@ -7,7 +7,7 @@ import net.minecraft.entity.ai.goal.ActiveTargetGoal;
 import net.minecraft.entity.ai.goal.LookAroundGoal;
 import net.minecraft.entity.ai.goal.MeleeAttackGoal;
 import net.minecraft.entity.ai.goal.RevengeGoal;
-import net.minecraft.entity.entityai.goal.WanderAroundFarGoal;
+import net.minecraft.entity.ai.goal.WanderAroundFarGoal;
 import net.minecraft.entity.attribute.DefaultAttributeContainer;
 import net.minecraft.entity.attribute.EntityAttributes;
 import net.minecraft.entity.data.DataTracker;
@@ -59,6 +59,7 @@ public class WatcherEntity extends HostileEntity implements GeoEntity {
     private int vanishTicks;
     private int dayTicks;
     private int lastWarnTick = -1000;
+    private int speakingTicks;
 
     public WatcherEntity(EntityType<? extends HostileEntity> entityType, World world) {
         super(entityType, world);
@@ -101,6 +102,12 @@ public class WatcherEntity extends HostileEntity implements GeoEntity {
         }
 
         tickTimers();
+        if (speakingTicks > 0) {
+            speakingTicks--;
+            this.dataTracker.set(SPEAKING, true);
+        } else {
+            this.dataTracker.set(SPEAKING, false);
+        }
 
         if (vanishTicks > 0) {
             vanishTicks--;
@@ -361,6 +368,7 @@ public class WatcherEntity extends HostileEntity implements GeoEntity {
         );
 
         this.dataTracker.set(SPEAKING, true);
+        speakingTicks = 28;
 
         world.playSound(
                 null,
@@ -372,19 +380,7 @@ public class WatcherEntity extends HostileEntity implements GeoEntity {
                 0.72F,
                 0.55F + world.getRandom().nextFloat() * 0.15F
         );
-
-        // Keep talking animation long enough to be visible, but short enough not to spam.
-        if (this.age - lastWarnTick > 35) {
-            lastWarnTick = this.age;
-        }
-
-        // Speaking flag is cleared on the next tick after the warning animation window.
-        world.getServer().execute(() -> {
-            if (this.isAlive()) {
-                this.dataTracker.set(SPEAKING, false);
-            }
-        });
-    }
+\n        // Keep the talking animation visible without creating a real-time task.\n        lastWarnTick = this.age;\n    }
 
     private void breakOneObstacle(ServerWorld world, PlayerEntity player) {
         Vec3d dir = player.getPos().subtract(this.getPos());
