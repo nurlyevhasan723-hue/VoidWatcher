@@ -380,7 +380,10 @@ public class WatcherEntity extends HostileEntity implements GeoEntity {
                 0.72F,
                 0.55F + world.getRandom().nextFloat() * 0.15F
         );
-\n        // Keep the talking animation visible without creating a real-time task.\n        lastWarnTick = this.age;\n    }
+
+        // Keep the talking animation visible without creating a real-time task.
+        lastWarnTick = this.age;
+    }
 
     private void breakOneObstacle(ServerWorld world, PlayerEntity player) {
         Vec3d dir = player.getPos().subtract(this.getPos());
