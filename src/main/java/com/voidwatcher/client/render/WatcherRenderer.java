@@ -15,6 +15,6 @@ public class WatcherRenderer extends GeoEntityRenderer<WatcherEntity> {
 
     @Override
     public Identifier getTextureLocation(WatcherEntity entity) {
-        return Identifier.of(VoidWatcherMod.MOD_ID, "textures/entity/Watcher.png");
+        return Identifier.of(VoidWatcherMod.MOD_ID, "textures/entity/watcher.png");
     }
 }
